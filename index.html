@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>UVIC Room Booking</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
+
+  :root {
+    --uvic-blue: #002754;
+    --uvic-gold: #f5aa1c;
+    --available: #4caf50;
+    --booked: #ff4d4d;
+    --bg: #f0f2f5;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+  }
+
+  .topnav {
+    background: var(--uvic-blue);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 36px;
+    height: 58px;
+    border-bottom: 3px solid var(--uvic-gold);
+  }
+  .topnav-brand {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: white;
+    letter-spacing: 0.08em;
+  }
+  .topnav-brand span { color: var(--uvic-gold); }
+  .tab-btns { display: flex; gap: 4px; }
+  .tab-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    padding: 7px 22px;
+    border: 2px solid transparent;
+    border-radius: 5px;
+    cursor: pointer;
+    background: transparent;
+    color: rgba(255,255,255,0.6);
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color: white; border-color: rgba(255,255,255,0.25); }
+  .tab-btn.active { background: var(--uvic-gold); color: var(--uvic-blue); border-color: var(--uvic-gold); }
+
+  .pico-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+    transition: all 0.3s;
+  }
+  .pico-status.unknown   { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); }
+  .pico-status.connected { background: #e8f5e9; color: #2e7d32; }
+  .pico-status.error     { background: #ffebee; color: #c62828; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ══ BOOKING PAGE ══ */
+  .booking-layout {
+    display: flex;
+    max-width: 1060px;
+    margin: 32px auto;
+    background: white;
+    border: 2px solid var(--uvic-blue);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+    overflow: hidden;
+    min-height: 680px;
+  }
+  .left-panel {
+    flex: 1.6;
+    border-right: 1px solid #dde1e9;
+    padding: 30px 26px 28px 30px;
+    display: flex;
+    flex-direction: column;
+  }
+  .left-panel h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--uvic-blue);
+    font-size: 1.6rem;
+    letter-spacing: 0.05em;
+    margin-bottom: 22px;
+  }
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .month-nav button {
+    border: none;
+    background: var(--uvic-blue);
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 7px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .month-nav button:hover { background: #021631; }
+  #displayDate {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--uvic-blue);
+    width: 170px;
+    text-align: center;
+  }
+  .calendar-table { border-collapse: collapse; width: 100%; }
+  .calendar-table th, .calendar-table td {
+    border: 1px solid #ddd;
+    padding: 9px 10px;
+    height: 65px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    vertical-align: top;
+    text-align: left;
+    transition: background 0.2s;
+  }
+  .calendar-table th {
+    background: #eef0f4;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  .empty { background: white; }
+  .past  { background: #f5f5f5; color: #bbb; cursor: default; }
+  .available { background: var(--available); color: white; cursor: pointer; }
+  .available:hover { background: #3a9b32; }
+  .booked { background: var(--booked); color: white; cursor: default; }
+  .selected-date { outline: 3px solid var(--uvic-gold); }
+
+  #selectedDateDisplay {
+    margin-top: 16px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--uvic-blue);
+    min-height: 24px;
+  }
+  #timeSelectionContainer { margin-top: 12px; }
+  #timeSelectionContainer label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--uvic-blue);
+  }
+  .confirm-btn {
+    margin-top: 16px;
+    background: var(--uvic-gold);
+    color: var(--uvic-blue);
+    border: 2px solid var(--uvic-blue);
+    padding: 13px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.05em;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    width: 100%;
+  }
+  .confirm-btn:hover { background: #d29916; }
+  .confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #toast {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  #toast.success { background: #e8f5e9; color: #2e7d32; border: 1.5px solid #2e7d32; }
+  #toast.error   { background: #ffebee; color: #c62828; border: 1.5px solid #c62828; }
+  #toast.info    { background: #e3f2fd; color: #1565c0; border: 1.5px solid #1565c0; }
+
+  #bookingList { margin-top: 14px; max-height: 130px; overflow-y: auto; }
+  .booking-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f5f7fa;
+    border: 1px solid #dde1e9;
+    border-radius: 6px;
+    padding: 7px 10px;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+    color: var(--uvic-blue);
+  }
+  .booking-item button {
+    background: none;
+    border: none;
+    color: var(--booked);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 2px 6px;
+  }
+  .booking-item button:hover { text-decoration: underline; }
+
+  .legend-box {
+    margin-top: 18px;
+    border: 2px solid var(--uvic-blue);
+    border-radius: 8px;
+    padding: 14px 20px;
+  }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 7px 0;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--uvic-blue);
+  }
+  .color-box       { width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid #ccc; }
+  .color-available { background: var(--available); }
+  .color-booked    { background: var(--booked); }
+  .color-past      { background: #f5f5f5; border-color: #ddd; }
+
+  .right-panel {
+    flex: 1;
+    padding: 38px 32px 28px;
+    background: #fafbfc;
+    display: flex;
+    flex-direction: column;
+  }
+  .uvic-header { margin-bottom: 28px; }
+  .uvic-header h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 3.8rem;
+    color: var(--uvic-blue);
+    font-weight: 700;
+    line-height: 1;
+  }
+  .uvic-header p { font-size: 1.05rem; font-weight: 600; color: var(--uvic-blue); margin-top: 6px; }
+
+  .dropdown {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 2px solid #bbb;
+    font-size: 1rem;
+    width: 100%;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+
+  #roomStatusBadge {
+    display: none;
+    margin-bottom: 14px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  #roomStatusBadge.all-clear    { background: #e8f5e9; color: #2e7d32; border: 1.5px solid #2e7d32; }
+  #roomStatusBadge.has-bookings { background: #fff3e0; color: #e65100; border: 1.5px solid #e65100; }
+
+  .map-container {
+    margin-top: auto;
+    border-radius: 10px;
+    height: 280px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0,0,0,0.18);
+  }
+  .map-container iframe { width: 100%; height: 100%; border: none; }
+
+  /* ══ DATA PAGE ══ */
+  .data-layout { max-width: 960px; margin: 36px auto; padding: 0 20px 40px; }
+  .data-header {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--uvic-blue);
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    margin-bottom: 28px;
+    padding-bottom: 14px;
+    border-bottom: 3px solid var(--uvic-gold);
+  }
+  .data-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  .data-card {
+    background: white;
+    border: 2px solid var(--uvic-blue);
+    border-radius: 10px;
+    padding: 24px 22px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .data-card-label { font-family:'IBM Plex Mono',monospace; font-size:0.75rem; letter-spacing:0.1em; color:#888; text-transform:uppercase; }
+  .data-card-value { font-family:'IBM Plex Mono',monospace; font-size:2.4rem; font-weight:700; color:var(--uvic-blue); line-height:1; }
+  .data-card-sub   { font-size:0.9rem; color:#666; font-weight:500; }
+  .temp-bar-wrap   { background:#eef0f4; border-radius:6px; height:8px; overflow:hidden; margin-top:4px; }
+  .temp-bar        { height:100%; border-radius:6px; background:linear-gradient(90deg,#4fc3f7,#f5aa1c,#ff4d4d); transition:width 0.5s; }
+
+  .occ-badge {
+    display:inline-block; padding:6px 16px; border-radius:20px;
+    font-family:'IBM Plex Mono',monospace; font-size:0.95rem; font-weight:700;
+    letter-spacing:0.05em; transition:all 0.4s;
+  }
+  .occ-badge.occupied { background:#fff3e0; color:#e65100; border:2px solid #e65100; }
+  .occ-badge.vacant   { background:#e8f5e9; color:#2e7d32; border:2px solid #2e7d32; }
+  .occ-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; animation:pulse 1.5s infinite; }
+  .occ-badge.occupied .occ-dot { background:#e65100; }
+  .occ-badge.vacant   .occ-dot { background:#2e7d32; animation:none; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  .booked-tag {
+    display:inline-block; margin-top:8px; padding:3px 10px; border-radius:12px;
+    font-size:0.78rem; font-weight:700; background:#e3f2fd; color:#1565c0; border:1px solid #1565c0;
+  }
+
+  .led-row { display:flex; gap:10px; margin-top:4px; }
+  .led-circle { width:22px; height:22px; border-radius:50%; border:2px solid #ccc; background:#eee; transition:all 0.3s; }
+  .led-circle.on { background:var(--uvic-gold); border-color:var(--uvic-gold); box-shadow:0 0 8px var(--uvic-gold); }
+
+  .data-refresh-note { font-size:0.78rem; color:#aaa; margin-top:4px; }
+
+  .sensor-row  { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:20px; }
+  .sensor-card { background:white; border:2px solid var(--uvic-blue); border-radius:10px; padding:20px 22px; box-shadow:0 3px 12px rgba(0,0,0,0.08); }
+  .sensor-label      { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; letter-spacing:0.1em; color:#888; text-transform:uppercase; margin-bottom:10px; }
+  .sensor-mini-value { font-family:'IBM Plex Mono',monospace; font-size:1.6rem; font-weight:700; color:var(--uvic-blue); }
+  .sensor-mini-unit  { font-size:0.85rem; color:#888; margin-left:4px; }
+
+  @media (max-width: 760px) {
+    .booking-layout { flex-direction: column; }
+    .left-panel, .right-panel { border: none; }
+    .data-grid { grid-template-columns: 1fr; }
+    .sensor-row { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 550px) {
+    .uvic-header h1 { font-size: 2.8rem; }
+    .topnav { padding: 0 16px; }
+    .tab-btn { padding: 7px 12px; font-size: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-brand">UVIC <span>//</span> ROOM SYSTEM</div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span class="pico-status unknown" id="picoStatus">⬤ PICO</span>
+    <div class="tab-btns">
+      <button class="tab-btn active" onclick="showPage('booking', this)">BOOKING</button>
+      <button class="tab-btn"        onclick="showPage('data', this)">DATA</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ══ BOOKING PAGE ══ -->
+<div id="page-booking" class="page active">
+  <div class="booking-layout">
+    <section class="left-panel">
+      <h2>ROOM BOOKING</h2>
+      <nav class="month-nav">
+        <button onclick="changeMonth(-1)">&lt;</button>
+        <div id="displayDate">March 2026</div>
+        <button onclick="changeMonth(1)">&gt;</button>
+      </nav>
+      <table class="calendar-table">
+        <thead>
+          <tr>
+            <th>SUN</th><th>MON</th><th>TUE</th>
+            <th>WED</th><th>THU</th><th>FRI</th><th>SAT</th>
+          </tr>
+        </thead>
+        <tbody id="calendarBody"></tbody>
+      </table>
+      <div id="selectedDateDisplay" style="color:var(--uvic-blue);">No date selected</div>
+      <div id="timeSelectionContainer"></div>
+      <div id="toast"></div>
+      <button class="confirm-btn" type="button" onclick="confirmBooking()">CONFIRM BOOKING</button>
+      <div id="bookingList"></div>
+      <div class="legend-box">
+        <div class="legend-row"><div class="color-box color-available"></div>Available</div>
+        <div class="legend-row"><div class="color-box color-booked"></div>Fully Booked</div>
+        <div class="legend-row"><div class="color-box color-past"></div>Past / Unavailable</div>
+      </div>
+    </section>
+
+    <aside class="right-panel">
+      <div class="uvic-header">
+        <h1>UVIC</h1>
+        <p>University of Victoria</p>
+      </div>
+      <select id="buildingSelect" class="dropdown" onchange="onBuildingChange()">
+        <option value="" selected disabled>Select Building</option>
+        <option value="MAC">Maclaurin Building (MAC)</option>
+        <option value="COR">Cornett Building (COR)</option>
+        <option value="BWC">Bob Wright Centre (BWC)</option>
+        <option value="ELL">Elliott Building (ELL)</option>
+        <option value="ECS">Engineering and Computer Science Building (ECS)</option>
+        <option value="FRA">Fraser Building (FRA)</option>
+        <option value="HHB">Hickman Building (HHB)</option>
+        <option value="CLE">Clearihue Building (CLE)</option>
+        <option value="DSB">Strong Building (DSB)</option>
+        <option value="MWB">Michael Williams Building (MWB)</option>
+      </select>
+      <select id="roomSelect" class="dropdown" onchange="onRoomChange()">
+        <option value="" selected disabled>Select Room</option>
+      </select>
+      <div id="roomStatusBadge"></div>
+      <div class="map-container">
+        <iframe
+          src="https://www.google.com/maps?q=University%20of%20Victoria,%20Victoria%20BC&z=17&output=embed"
+          allowfullscreen loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          title="University of Victoria Location Map">
+        </iframe>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ══ DATA PAGE ══ -->
+<div id="page-data" class="page">
+  <div class="data-layout">
+    <div class="data-header">// ROOM DATA MONITOR</div>
+    <div class="data-grid">
+
+      <div class="data-card">
+        <div class="data-card-label">Temperature</div>
+        <div class="data-card-value" id="tempValue">--<span style="font-size:1.2rem;font-weight:400;">°C</span></div>
+        <div class="temp-bar-wrap"><div class="temp-bar" id="tempBar" style="width:0%;"></div></div>
+        <div class="data-card-sub" id="tempDesc">Waiting for Pico...</div>
+      </div>
+
+      <div class="data-card">
+        <div class="data-card-label">Occupancy Status</div>
+        <div style="margin-top:4px;">
+          <span class="occ-badge vacant" id="occBadge">
+            <span class="occ-dot"></span>
+            <span id="occText">UNKNOWN</span>
+          </span>
+        </div>
+        <div id="bookedTag" style="display:none;" class="booked-tag">&#128197; Active booking</div>
+        <div class="data-card-sub" id="occDesc">Waiting for Pico...</div>
+        <div class="data-refresh-note" id="lastUpdated">Never updated</div>
+      </div>
+
+      <div class="data-card">
+        <div class="data-card-label">Lights / LEDs</div>
+        <div class="data-card-value" id="lightsValue" style="font-size:1.4rem;">--</div>
+        <div class="led-row">
+          <div class="led-circle" id="led1"></div>
+          <div class="led-circle" id="led2"></div>
+        </div>
+        <div class="data-card-sub" id="lightDesc">Waiting for Pico...</div>
+      </div>
+
+    </div>
+    <div class="sensor-row">
+      <div class="sensor-card">
+        <div class="sensor-label">IR Sensor 1</div>
+        <div class="sensor-mini-value" id="s1val">--<span class="sensor-mini-unit">digital</span></div>
+      </div>
+      <div class="sensor-card">
+        <div class="sensor-label">IR Sensor 2</div>
+        <div class="sensor-mini-value" id="s2val">--<span class="sensor-mini-unit">digital</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══ PICO CONNECTION ══ */
+// ★ Change this if your Pico prints a different IP in Thonny
+const PICO_IP = 'http://192.168.4.1';
+
+const TIME_SLOT_HOURS = {
+  '8:00 AM':8, '9:00 AM':9, '10:00 AM':10, '11:00 AM':11,
+  '12:00 PM':12, '1:00 PM':13, '2:00 PM':14, '3:00 PM':15,
+  '4:00 PM':16, '5:00 PM':17, '6:00 PM':18, '7:00 PM':19, '8:00 PM':20
+};
+
+function setPicoStatus(state) {
+  const el = document.getElementById('picoStatus');
+  el.className   = 'pico-status ' + state;
+  el.textContent = state === 'connected' ? '⬤ PICO OK' :
+                   state === 'error'     ? '⬤ PICO OFF' : '⬤ PICO';
+}
+
+async function picoPost(endpoint, payload) {
+  try {
+    const res = await fetch(PICO_IP + endpoint, {
+      method: 'POST',
+      body:   JSON.stringify(payload)
+    });
+    if (res.ok) setPicoStatus('connected');
+    else        setPicoStatus('error');
+  } catch (e) {
+    setPicoStatus('error');
+    console.warn('Pico POST failed:', endpoint, e);
+  }
+}
+
+async function syncTime() {
+  await picoPost('/sync-time', { timestamp: Math.floor(Date.now() / 1000) });
+}
+
+async function sendBookingToPico(year, month, day, time) {
+  const hour = TIME_SLOT_HOURS[time];
+  if (hour !== undefined)
+    await picoPost('/book', { year, month, day, hour });
+}
+
+async function cancelBookingOnPico(year, month, day, time) {
+  const hour = TIME_SLOT_HOURS[time];
+  if (hour !== undefined)
+    await picoPost('/cancel', { year, month, day, hour });
+}
+
+async function pollPico() {
+  try {
+    const res  = await fetch(PICO_IP + '/status');
+    const data = await res.json();
+    setPicoStatus('connected');
+
+    // Temperature
+    const temp = data.temp;
+    document.getElementById('tempValue').innerHTML =
+      temp.toFixed(1) + '<span style="font-size:1.2rem;font-weight:400;">°C</span>';
+    document.getElementById('tempBar').style.width =
+      Math.max(0, Math.min(100, (temp - 15) / 20 * 100)) + '%';
+    const setpoint = data.occupied ? 21 : 17;
+    const heatingOn = temp < setpoint;
+    document.getElementById('tempDesc').textContent =
+      heatingOn ? 'Heating ON (target ' + setpoint + '°C)' : 'Heating OFF (target ' + setpoint + '°C)';
+
+    // Occupancy
+    const badge = document.getElementById('occBadge');
+    badge.className = 'occ-badge ' + (data.occupied ? 'occupied' : 'vacant');
+    document.getElementById('occText').textContent = data.occupied ? 'OCCUPIED' : 'VACANT';
+    document.getElementById('occDesc').textContent = data.occupied ? 'Room is in use' : 'Room is free';
+    document.getElementById('bookedTag').style.display = data.booked ? 'inline-block' : 'none';
+
+    // Lights
+    const lightMap = { Bright:'BRIGHT', Dim:'DIM', Off:'OFF' };
+    document.getElementById('lightsValue').textContent = lightMap[data.light] || data.light;
+    document.getElementById('lightDesc').textContent =
+      data.light === 'Bright' ? '2 LEDs active' :
+      data.light === 'Dim'    ? '1 LED active'  : 'No lights';
+    document.getElementById('led1').className = 'led-circle' + (data.leds >= 1 ? ' on' : '');
+    document.getElementById('led2').className = 'led-circle' + (data.leds >= 2 ? ' on' : '');
+
+    document.getElementById('lastUpdated').textContent =
+      'Last updated: ' + new Date().toLocaleTimeString();
+
+  } catch (e) {
+    setPicoStatus('error');
+  }
+}
+
+/* ══ PAGE SWITCHING ══ */
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ══ BOOKING STORE ══ */
+const bookings = {};
+const TIME_SLOTS = [
+  '8:00 AM','9:00 AM','10:00 AM','11:00 AM',
+  '12:00 PM','1:00 PM','2:00 PM','3:00 PM',
+  '4:00 PM','5:00 PM','6:00 PM','7:00 PM','8:00 PM'
+];
+
+function dateKey(y,m,d) { return `${y}-${m}-${d}`; }
+function isBooked(room,y,m,d,time) {
+  const k=dateKey(y,m,d);
+  return !!(bookings[room]&&bookings[room][k]&&bookings[room][k].has(time));
+}
+function bookedCount(room,y,m,d) {
+  const k=dateKey(y,m,d);
+  return (bookings[room]&&bookings[room][k])?bookings[room][k].size:0;
+}
+function addBooking(room,y,m,d,time) {
+  const k=dateKey(y,m,d);
+  if(!bookings[room])bookings[room]={};
+  if(!bookings[room][k])bookings[room][k]=new Set();
+  bookings[room][k].add(time);
+}
+function removeBooking(room,y,m,d,time) {
+  const k=dateKey(y,m,d);
+  if(bookings[room]&&bookings[room][k]){
+    bookings[room][k].delete(time);
+    if(bookings[room][k].size===0)delete bookings[room][k];
+  }
+}
+
+/* ══ ROOMS ══ */
+const roomsByBuilding = {
+  MAC:['MAC225','MAC310','MAC118'], COR:['COR122','COR211','COR115'],
+  BWC:['BWC150','BWC344','BWC410'], ELL:['ELL343','ELL302','ELL205'],
+  ECS:['ECS116','ECS123','ECS211'], FRA:['FRA103','FRA203','FRA100'],
+  HHB:['HHB202','HHB105','HHB117'], CLE:['CLE210','CLE120','CLE142'],
+  DSB:['DSB108','DSB116','DSB102'], MWB:['MWB210','MWB108','MWB312']
+};
+function getRoom(){return document.getElementById('roomSelect').value||null;}
+
+function onBuildingChange(){
+  const building=document.getElementById('buildingSelect').value;
+  const rs=document.getElementById('roomSelect');
+  rs.innerHTML='<option value="" disabled selected>Select Room</option>';
+  (roomsByBuilding[building]||[]).forEach(r=>{
+    const o=document.createElement('option');
+    o.value=o.textContent=r; rs.appendChild(o);
+  });
+  resetSelection(); generateCalendar(currentYear,currentMonth);
+}
+function onRoomChange(){
+  resetSelection(); generateCalendar(currentYear,currentMonth);
+  updateRoomBadge(); renderBookingList();
+}
+function resetSelection(){
+  selectedDateCell=null; selectedDate=null;
+  document.getElementById('selectedDateDisplay').textContent='No date selected';
+  document.getElementById('timeSelectionContainer').innerHTML='';
+  hideToast();
+}
+
+/* ══ CALENDAR ══ */
+let selectedDateCell=null, selectedDate=null;
+let currentYear=2026, currentMonth=2;
+const today=new Date(); today.setHours(0,0,0,0);
+function isPast(y,m,d){return new Date(y,m,d)<today;}
+
+function generateCalendar(year,month){
+  const body=document.getElementById('calendarBody');
+  const disp=document.getElementById('displayDate');
+  body.innerHTML='';
+  disp.textContent=new Date(year,month).toLocaleString('default',{month:'long',year:'numeric'});
+  const firstDay=new Date(year,month,1).getDay();
+  const total=daysInMonth(year,month);
+  const room=getRoom();
+  let date=1;
+  for(let w=0;w<6;w++){
+    const row=document.createElement('tr');
+    for(let d=0;d<7;d++){
+      const cell=document.createElement('td');
+      if((w===0&&d<firstDay)||date>total){
+        cell.classList.add('empty');
+      } else {
+        const thisDate=date;
+        cell.textContent=date;
+        if(isPast(year,month,date)){
+          cell.classList.add('past');
+        } else {
+          const cnt=room?bookedCount(room,year,month,date):0;
+          if(cnt>=TIME_SLOTS.length){ cell.classList.add('booked'); }
+          else {
+            cell.classList.add('available');
+            cell.style.cursor='pointer';
+            cell.addEventListener('click',()=>selectDate(cell,year,month,thisDate));
+          }
+        }
+        if(today.getFullYear()===year&&today.getMonth()===month&&today.getDate()===date){
+          cell.style.textDecoration='underline'; cell.style.fontWeight='900';
+        }
+        date++;
+      }
+      row.appendChild(cell);
+    }
+    body.appendChild(row);
+    if(date>total)break;
+  }
+}
+
+function selectDate(cell,year,month,date){
+  if(selectedDateCell&&selectedDateCell!==cell)
+    selectedDateCell.classList.remove('selected-date');
+  selectedDateCell=cell; selectedDate={year,month,day:date};
+  cell.classList.add('selected-date');
+  const d=new Date(year,month,date);
+  let sfx='th';
+  if(date%10===1&&date!==11)sfx='st';
+  else if(date%10===2&&date!==12)sfx='nd';
+  else if(date%10===3&&date!==13)sfx='rd';
+  const str=d.toLocaleString('default',{weekday:'short'})+', '+
+            d.toLocaleString('default',{month:'short'})+' '+date+sfx;
+  document.getElementById('selectedDateDisplay').textContent='Selected: '+str;
+  buildTimeSelect(year,month,date); hideToast();
+}
+
+function buildTimeSelect(year,month,day){
+  const room=getRoom();
+  const container=document.getElementById('timeSelectionContainer');
+  container.innerHTML='';
+  const label=document.createElement('label');
+  label.setAttribute('for','timeSelect');
+  label.style.cssText='display:block;font-weight:600;margin-bottom:4px;color:var(--uvic-blue);';
+  label.textContent='Select Time:';
+  container.appendChild(label);
+  const select=document.createElement('select');
+  select.id='timeSelect';
+  select.style.cssText='width:100%;padding:8px;border-radius:6px;border:1.5px solid #ccc;font-family:inherit;';
+  const ph=document.createElement('option');
+  ph.value='';ph.disabled=true;ph.selected=true;ph.textContent='Choose a time slot';
+  select.appendChild(ph);
+  TIME_SLOTS.forEach(time=>{
+    const opt=document.createElement('option');
+    const busy=room&&isBooked(room,year,month,day,time);
+    opt.value=time;
+    opt.textContent=busy?`${time}  —  BOOKED`:time;
+    opt.disabled=busy;
+    if(busy)opt.style.color='#cc0000';
+    select.appendChild(opt);
+  });
+  container.appendChild(select);
+}
+
+/* ══ CONFIRM BOOKING ══ */
+async function confirmBooking(){
+  const room=getRoom();
+  const timeSelect=document.getElementById('timeSelect');
+  if(!room){showToast('Please select a building and room.','error');return;}
+  if(!selectedDate){showToast('Please select a date on the calendar.','error');return;}
+  if(!timeSelect||!timeSelect.value){showToast('Please select a time slot.','error');return;}
+  const {year,month,day}=selectedDate;
+  const time=timeSelect.value;
+  if(isBooked(room,year,month,day,time)){showToast(`${room} is already booked at ${time}.`,'error');return;}
+
+  const btn=document.querySelector('.confirm-btn');
+  btn.disabled=true;
+  showToast('Sending to Pico...','info');
+
+  addBooking(room,year,month,day,time);
+  await sendBookingToPico(year,month,day,time);
+
+  generateCalendar(currentYear,currentMonth);
+  buildTimeSelect(year,month,day);
+  updateRoomBadge(); renderBookingList();
+  btn.disabled=false;
+  const dateStr=new Date(year,month,day).toLocaleString('default',{month:'short',day:'numeric'});
+  showToast(`✓ Booked ${room} on ${dateStr} at ${time}`,'success');
+}
+
+/* ══ BOOKING LIST ══ */
+function renderBookingList(){
+  const room=getRoom();
+  const container=document.getElementById('bookingList');
+  container.innerHTML='';
+  if(!room||!bookings[room])return;
+  const items=[];
+  for(const k in bookings[room]){
+    const [y,m,d]=k.split('-').map(Number);
+    bookings[room][k].forEach(time=>items.push({y,m,d,time}));
+  }
+  if(!items.length)return;
+  items.sort((a,b)=>a.y!==b.y?a.y-b.y:a.m!==b.m?a.m-b.m:a.d!==b.d?a.d-b.d:TIME_SLOTS.indexOf(a.time)-TIME_SLOTS.indexOf(b.time));
+  const title=document.createElement('div');
+  title.style.cssText='font-weight:700;color:var(--uvic-blue);font-size:0.85rem;margin-bottom:6px;margin-top:4px;';
+  title.textContent=`Bookings for ${room}:`;
+  container.appendChild(title);
+  items.forEach(({y,m,d,time})=>{
+    const label=new Date(y,m,d).toLocaleString('default',{month:'short',day:'numeric'})+' @ '+time;
+    const item=document.createElement('div');
+    item.className='booking-item';
+    item.innerHTML=`<span>${label}</span><button onclick="cancelBooking('${room}',${y},${m},${d},'${time}')">Cancel</button>`;
+    container.appendChild(item);
+  });
+}
+
+async function cancelBooking(room,y,m,d,time){
+  removeBooking(room,y,m,d,time);
+  await cancelBookingOnPico(y,m,d,time);
+  generateCalendar(currentYear,currentMonth);
+  if(selectedDate&&selectedDate.year===y&&selectedDate.month===m&&selectedDate.day===d)
+    buildTimeSelect(y,m,d);
+  updateRoomBadge(); renderBookingList();
+  showToast(`Booking for ${time} cancelled.`,'success');
+}
+
+function updateRoomBadge(){
+  const room=getRoom();
+  const badge=document.getElementById('roomStatusBadge');
+  if(!room){badge.style.display='none';return;}
+  const total=bookings[room]?Object.values(bookings[room]).reduce((s,set)=>s+set.size,0):0;
+  badge.style.display='block';
+  if(total===0){badge.className='all-clear';badge.textContent=`✓ ${room} — No bookings yet`;}
+  else{badge.className='has-bookings';badge.textContent=`${room} — ${total} booking${total>1?'s':''} scheduled`;}
+}
+
+/* ══ TOAST ══ */
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className=type; t.style.display='block';
+  clearTimeout(t._tid); t._tid=setTimeout(()=>{t.style.display='none';},4000);
+}
+function hideToast(){document.getElementById('toast').style.display='none';}
+
+/* ══ MONTH NAV ══ */
+function changeMonth(off){
+  currentMonth+=off;
+  if(currentMonth>11){currentMonth=0;currentYear++;}
+  else if(currentMonth<0){currentMonth=11;currentYear--;}
+  generateCalendar(currentYear,currentMonth); resetSelection();
+}
+function isLeapYear(y){return(y%4===0&&y%100!==0)||(y%400===0);}
+function daysInMonth(y,m){return[31,isLeapYear(y)?29:28,31,30,31,30,31,31,30,31,30,31][m];}
+
+/* ══ INIT ══ */
+window.onload = () => {
+  generateCalendar(currentYear, currentMonth);
+  syncTime();
+  pollPico();
+  setInterval(pollPico, 5000);
+};
+</script>
+</body>
+</html>
