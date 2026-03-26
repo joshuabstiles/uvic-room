@@ -749,6 +749,7 @@ async function confirmBooking(){
   showToast('Sending to Pico...','info');
 
   addBooking(room,year,month,day,time);
+  await syncTime();
   await sendBookingToPico(year,month,day,time);
 
   generateCalendar(currentYear,currentMonth);
